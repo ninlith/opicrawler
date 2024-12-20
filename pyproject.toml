@@ -1,0 +1,71 @@
+[project]
+name = "opicrawler"
+version = "0.1"
+description = "Web data extractor"
+authors = [
+    {name = "Okko Hartikainen", email = "okko.hartikainen@yandex.com"},
+]
+dependencies = [
+    "aiohttp>=3.11.7",
+    "html2text>=2024.2.26",
+    "playwright>=1.49.0",
+    "platformdirs>=4.3.6",
+    "rich>=13.9.4",
+    "openai>=1.56.0",
+    "pydantic>=2.10.3",
+    "stamina>=24.3.0",
+    "sqlmodel>=0.0.22",
+]  # uBlock Origin Lite dependency defined in post_install.py
+requires-python = ">=3.11"
+readme = "README.md"
+license = {text = "MIT"}
+
+[project.scripts]
+opicrawler = "opicrawler.main:main"
+
+[build-system]
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"
+
+[dependency-groups]
+dev = [
+    "pylint>=3.3.1",
+    "pytest>=8.3.3",
+    "pytest-asyncio>=0.24.0",
+    "aioresponses>=0.7.7",
+]
+
+[tool.pylint."MESSAGES CONTROL"]
+disable = [
+    "logging-fstring-interpolation",
+]
+
+[tool.pdm]
+distribution = true
+
+[tool.pdm.scripts]
+_.env_file = ".env"
+openai_api_key="""python -c "import os; print(os.environ['OPENAI_API_KEY'])"
+"""
+repl = "python"
+doc = "python -m pydoc"
+lint = "pylint src/opicrawler/"
+test = "pytest"
+consoletest = "pytest --integration --capture=no --quiet tests/test_console_output.py"
+fitcat = """python -c "# Fitcat. A cat that truncates long lines.
+import contextlib, os, shutil, sys
+try:
+    width = os.get_terminal_size(sys.stdin.fileno()).columns
+except OSError:
+    width = shutil.get_terminal_size().columns
+with contextlib.ExitStack() as stack, contextlib.suppress(BrokenPipeError):
+    for f in [stack.enter_context(open(fname)) for fname in sys.argv[1:]]:
+        [print(line[:width].rstrip()) for line in f]
+"
+"""
+
+[tool.pytest.ini_options]
+testpaths = [
+    "tests",
+]
+asyncio_default_fixture_loop_scope = "function"
