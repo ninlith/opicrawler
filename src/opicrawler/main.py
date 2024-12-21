@@ -133,7 +133,8 @@ async def async_main():
 
         # Allow asyncio to stabilize to prevent ConnectionResetError messages
         # flooding the debug log (in Windows).
-        if isinstance(asyncio.get_event_loop(), asyncio.ProactorEventLoop):
+        if (hasattr(asyncio, "ProactorEventLoop")
+                and isinstance(asyncio.get_event_loop(), asyncio.ProactorEventLoop)):
             waiting_status_id = progress_status.add_task("Waiting for asyncio to stabilize")
             await asyncio.sleep(1)
             progress_status.remove_task(waiting_status_id)
