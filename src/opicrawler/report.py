@@ -2,7 +2,7 @@
 
 import itertools
 import logging
-from sqlmodel import select, func
+from sqlmodel import select, func, or_
 from opicrawler.orm import get_session, Site, FinalURL
 
 logger = logging.getLogger(__name__)
@@ -84,6 +84,30 @@ def _sites_with_url_resolution_errors():
     return results
 
 
+def _other_errors():
+    """Return a Markdown list of other errors."""
+    results = []
+    with get_session() as session:
+        final_urls = session.exec(
+            select(FinalURL).where(
+                or_(
+                    FinalURL.html_fetch_error.is_not(None),
+                    FinalURL.screenshot_error.is_not(None),
+                )
+            )
+        )
+        for final_url in final_urls:
+            results.append(f"* {final_url.site_id} {final_url.url}")
+            results.extend(
+                f"    * {k}: {v}"
+                for k, v
+                in {"HTML FETCH ERROR: ": final_url.html_fetch_error,
+                    "SCREENSHOT ERROR: ": final_url.screenshot_error}.items()
+                if v
+            )
+    return results
+
+
 def _site_extracts():
     """Return site extracts in Markdown format."""
     site_extracts = []
@@ -136,6 +160,7 @@ def write_report(output_path):
             ("Sites with Non-Opiferum Final URLs", _non_opiferum_sites()),
             ("Sites with Multiple Final URLs", _sites_with_multiple_final_urls()),
             ("Sites with URL Resolution Errors", _sites_with_url_resolution_errors()),
+            ("Other Errors", _other_errors()),
             ("Site Extracts", _site_extracts()),
         )
     )
