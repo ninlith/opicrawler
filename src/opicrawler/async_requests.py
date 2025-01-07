@@ -104,7 +104,7 @@ async def _resolve_url(session, domain):
     return results
 
 
-async def _request(session, semaphore, id_domain_pair, counter, callback,
+async def _request(session, semaphore, id_domain_pair, callback,
                    opiferum_ip_addresses):
     """Send HEAD, GET and DNS requests."""
     async with semaphore:
@@ -143,9 +143,9 @@ async def gather_responses(
             tasks = []
             n = len(id_domain_pairs)
             callback(total=n)
-            for i, id_domain_pair in enumerate(id_domain_pairs, 1):
+            for id_domain_pair in id_domain_pairs:
                 task = tg.create_task(
-                    _request(session, semaphore, id_domain_pair, (i, n), callback,
+                    _request(session, semaphore, id_domain_pair, callback,
                              opiferum_ip_addresses)
                 )
                 tasks.append(task)

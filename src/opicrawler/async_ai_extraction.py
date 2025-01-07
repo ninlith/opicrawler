@@ -5,7 +5,7 @@ import json
 import logging
 from typing import Optional
 import openai
-import pydantic_core
+import pydantic
 import stamina
 from openai import AsyncOpenAI
 from pydantic import BaseModel
@@ -58,7 +58,7 @@ def _error_to_retry(exc: Exception) -> bool:
     """Return True if Exception is of specified type."""
     # Retry with warning.
     # BUG: https://github.com/openai/openai-python/issues/1763
-    if isinstance(exc, pydantic_core._pydantic_core.ValidationError):
+    if isinstance(exc, pydantic.ValidationError):
         logger.warning(exc)
         return True
 
@@ -66,7 +66,7 @@ def _error_to_retry(exc: Exception) -> bool:
     return isinstance(exc, (openai.RateLimitError, openai.APIError, asyncio.TimeoutError))
 
 
-async def _extract_data(*, client, model, page, counter, callback):
+async def _extract_data(*, client, model, page, callback):
     """Extract structured information from a web page content."""
     callback(advance_secondary=1)
     page_content = json.dumps(page["text"])
@@ -131,7 +131,7 @@ async def _extract_data_with_semaphore(semaphore, **kwargs):
             return await _extract_data(**kwargs)  # pylint: disable=missing-kwoa
         except (openai.RateLimitError, openai.APIError, asyncio.TimeoutError) as exc:
             logger.error(exc)
-        except pydantic_core._pydantic_core.ValidationError as exc:
+        except pydantic.ValidationError as exc:
             logger.error(exc)
             logger.debug(kwargs)
         return kwargs["page"]
@@ -149,17 +149,16 @@ async def gather_extracts(
     client = AsyncOpenAI()
     n = len(pages)
     callback(total=n)
-    olm = OpenAILogMonitor(total=n)
+    olm = OpenAILogMonitor(total=n)  # pylint: disable=unused-variable
     tasks = []
     async with asyncio.TaskGroup() as tg:
-        for i, page in enumerate(pages, 1):
+        for page in pages:
             task = tg.create_task(
                 _extract_data_with_semaphore(
                     semaphore,
                     client=client,
                     model=openai_model,
                     page=page,
-                    counter=(i, n),
                     callback=callback,
                 )
             )

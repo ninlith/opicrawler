@@ -20,7 +20,6 @@ class CoalescingCache:
         self.autoclean = ttl and autoclean
         self.cache = OrderedDict()
         self.lock_map = defaultdict(asyncio.Lock)
-        self.stale_lock_keys = set()
         self.func_name = None
         self.cleanup_task = None
 

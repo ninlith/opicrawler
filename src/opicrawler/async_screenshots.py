@@ -17,11 +17,11 @@ logger = logging.getLogger(__name__)
     wait_max=10,
     wait_jitter=2,
 )
-async def _capture_page(*, context, pagedict, screenshot_path, render_wait,
-        full_page, resolutions, filetype, counter, callback):
+async def _capture_page(page_data, context, screenshot_path, render_wait,
+        full_page, resolutions, filetype, callback):
     """Open a webpage and capture screenshots of it."""
     callback(advance_secondary=1)
-    identifier, url = pagedict["site_id"], pagedict["url"]
+    identifier, url = page_data["site_id"], page_data["url"]
     page = await context.new_page()
     for resolution in resolutions:
         width, height = map(int, resolution.split("x"))
@@ -40,19 +40,18 @@ async def _capture_page(*, context, pagedict, screenshot_path, render_wait,
                               full_page=full_page)
     await page.close()
     callback(advance=1)
-    return pagedict
+    return page_data
 
 
-async def _capture_page_with_semaphore(semaphore, **kwargs):
+async def _capture_page_with_semaphore(semaphore, page_data, **kwargs):
     """Limit concurrency with semaphore and handle specific exceptions."""
     async with semaphore:
         try:
-            return await _capture_page(**kwargs)
+            return await _capture_page(page_data, **kwargs)
         except Error as error:
             logger.error(error)
-            pagedict = kwargs["pagedict"]
-            pagedict["screenshot_error"] = error
-            return pagedict
+            page_data["screenshot_error"] = error
+            return page_data
 
 
 async def capture_screenshots(
@@ -81,18 +80,17 @@ async def capture_screenshots(
         async with asyncio.TaskGroup() as tg:
             n = len(pages)
             callback(total=n)
-            for i, page in enumerate(pages, 1):
+            for page in pages:
                 task = tg.create_task(
                     _capture_page_with_semaphore(
                         semaphore,
+                        page,
                         context=context,
-                        pagedict=page,
                         screenshot_path=screenshot_path,
                         render_wait=options["render_wait"],
                         full_page=options["full_page"],
                         resolutions=options["resolutions"],
                         filetype=options["filetype"],
-                        counter=(i, n),
                         callback=callback,
                     )
                 )
