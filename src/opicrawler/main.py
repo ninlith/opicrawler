@@ -203,8 +203,8 @@ async def async_main():
                 "output_path": output_path,
                 "render_wait": console_args.render_wait,
                 "full_page": console_args.full_page,
-                "width": int(console_args.resolution.split("x")[0]),
-                "height": int(console_args.resolution.split("x")[1]),
+                "resolutions": console_args.resolutions,
+                "filetype": console_args.filetype,
             },
         )
         orm.update_pages(pages)

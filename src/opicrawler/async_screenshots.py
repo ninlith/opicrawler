@@ -17,25 +17,29 @@ logger = logging.getLogger(__name__)
     wait_max=10,
     wait_jitter=2,
 )
-async def _capture_page(*, context, pagedict, screenshot_path,
-        render_wait, full_page, counter, callback):
-    """Open a webpage and capture a screenshot of it."""
+async def _capture_page(*, context, pagedict, screenshot_path, render_wait,
+        full_page, resolutions, filetype, counter, callback):
+    """Open a webpage and capture screenshots of it."""
     callback(advance_secondary=1)
     identifier, url = pagedict["site_id"], pagedict["url"]
     page = await context.new_page()
-    await page.goto(url)
-    await page.wait_for_timeout(render_wait)
-    filename = filename_safe_encode(
-        url,
-        limit_length=True,
-        prefix=f"{identifier}_{counter[0]}=",  # to avoid collisions
-        postfix=".png",
-    )
-    logger.debug(
-        f"({counter[0]}/{counter[1]}), {identifier}, {url} -> '{filename}'"
-    )
-    await page.screenshot(path=screenshot_path/filename,
-                          full_page=full_page)
+    for resolution in resolutions:
+        width, height = map(int, resolution.split("x"))
+        await page.set_viewport_size({"width": width, "height": height})
+        # "A lot of websites don't expect phones to change size, so you should
+        # set the viewport size before navigating to the page."
+        await page.goto(url)
+        await page.wait_for_timeout(render_wait)
+        filename = filename_safe_encode(
+            url,
+            limit_length=True,
+            prefix=f"{identifier}_{counter[0]}_{width}x{height}=",
+            postfix=f".{filetype}",
+        )
+        logger.debug(
+            f"({counter[0]}/{counter[1]}), {identifier}, {url}, {width}x{height} -> '{filename}'"
+        )
+        await page.screenshot(path=screenshot_path/filename, full_page=full_page)
     await page.close()
     callback(advance=1)
     return pagedict
@@ -68,7 +72,6 @@ async def capture_screenshots(
         context = await p.chromium.launch_persistent_context(
             user_data_dir,
             headless=False,  # needs to be False apparently
-            viewport={"width": options["width"], "height": options["height"]},
             args=[
                 "--headless=new",
                 "--hide-scrollbars",
@@ -89,6 +92,8 @@ async def capture_screenshots(
                         screenshot_path=screenshot_path,
                         render_wait=options["render_wait"],
                         full_page=options["full_page"],
+                        resolutions=options["resolutions"],
+                        filetype=options["filetype"],
                         counter=(i, n),
                         callback=callback,
                     )

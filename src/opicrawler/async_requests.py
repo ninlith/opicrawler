@@ -123,7 +123,6 @@ async def _request(session, semaphore, id_domain_pair, counter, callback,
                 data["html"] = await _fetch_html(session, data["final_url"])  # GET
             except (aiohttp.ClientError, asyncio.TimeoutError) as exc:
                 data["html_fetch_error"] = str(exc)
-        logger.debug(f"({counter[0]}/{counter[1]}) {data}")
         callback(advance=1)
         return data
 

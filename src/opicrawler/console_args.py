@@ -111,9 +111,17 @@ def parse_arguments():
         metavar="MILLISECONDS",
     )
     screenshot_group.add_argument(
-        "--resolution",
-        help="page viewport resolution (default: %(default)s)",
-        default="1280x720",
+        "--filetype",
+        help="image file format (default: %(default)s)",
+        choices=["png", "jpeg"],
+        default="jpeg",
+    )
+    screenshot_group.add_argument(
+        "--resolutions",
+        help="page viewport resolutions (default: %(default)s)",
+        nargs="+",
+        default=["1280x720", "430x932"],
+        type=list,
         metavar="WIDTHxHEIGHT",
     )
     screenshot_group.add_argument(

@@ -37,7 +37,7 @@ def _non_opiferum_sites():
         sites = session.exec(
             select(Site)
             .join(FinalURL)
-            .where(FinalURL.external_to_opiferum is True)
+            .where(FinalURL.external_to_opiferum)
             .distinct()
         )
         for site in sites:
@@ -77,10 +77,10 @@ def _sites_with_url_resolution_errors():
         for site in sites:
             results.append(f'* {site.id}')
             for error in site.url_resolution_errors:
-                results.append(f'    * RESOLUTION ERROR: {error.start_url}: {error.error}')
+                results.append(f'    * ERROR: {error.start_url}: {error.error}')
             for final_url in site.final_urls:
                 start_urls = [start_url.url for start_url in final_url.start_urls]
-                results.append(f'    * RESOLUTION SUCCESS: {start_urls} -> {final_url.url}')
+                results.append(f'    * SUCCESS: {start_urls} -> {final_url.url}')
     return results
 
 
