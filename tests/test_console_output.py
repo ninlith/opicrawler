@@ -48,14 +48,14 @@ async def mock_capture_screenshots(*args, **kwargs):
             callback(advance=1)
 
     callback = kwargs["callback"]
-    id_url_pairs = kwargs["id_url_pairs"]
+    pages = kwargs["pages"]
     tasks_per_second = kwargs["options"]["tasks_per_second"]
     concurrency_limit = kwargs["options"]["concurrency_limit"]
     semaphore = asyncio.Semaphore(concurrency_limit)
     async with asyncio.TaskGroup() as tg:
-        n = len(id_url_pairs)
+        n = len(pages)
         callback(total=n)
-        for i, _ in enumerate(id_url_pairs):
+        for i, _ in enumerate(pages):
             task = tg.create_task(
                 mock_capture_page(semaphore, callback, (i, n))
             )

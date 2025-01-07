@@ -17,12 +17,11 @@ logger = logging.getLogger(__name__)
     wait_max=10,
     wait_jitter=2,
 )
-async def _capture_page(*, context, id_url_pair, screenshot_path,
+async def _capture_page(*, context, pagedict, screenshot_path,
         render_wait, full_page, counter, callback):
     """Open a webpage and capture a screenshot of it."""
     callback(advance_secondary=1)
-    error_message = None
-    identifier, url = id_url_pair
+    identifier, url = pagedict["site_id"], pagedict["url"]
     page = await context.new_page()
     await page.goto(url)
     await page.wait_for_timeout(render_wait)
@@ -39,7 +38,7 @@ async def _capture_page(*, context, id_url_pair, screenshot_path,
                           full_page=full_page)
     await page.close()
     callback(advance=1)
-    return (identifier, url, error_message)
+    return pagedict
 
 
 async def _capture_page_with_semaphore(semaphore, **kwargs):
@@ -49,14 +48,14 @@ async def _capture_page_with_semaphore(semaphore, **kwargs):
             return await _capture_page(**kwargs)
         except Error as error:
             logger.error(error)
-            error_message = error
-            identifier, url = kwargs["id_url_pair"]
-            return (identifier, url, error_message)
+            pagedict = kwargs["pagedict"]
+            pagedict["screenshot_error"] = error
+            return pagedict
 
 
 async def capture_screenshots(
         *,  # PEP 3102
-        id_url_pairs,
+        pages,
         path_to_extension,
         user_data_dir,
         callback,
@@ -79,14 +78,14 @@ async def capture_screenshots(
         )
         tasks = []
         async with asyncio.TaskGroup() as tg:
-            n = len(id_url_pairs)
+            n = len(pages)
             callback(total=n)
-            for i, id_url_pair in enumerate(id_url_pairs, 1):
+            for i, page in enumerate(pages, 1):
                 task = tg.create_task(
                     _capture_page_with_semaphore(
                         semaphore,
                         context=context,
-                        id_url_pair=id_url_pair,
+                        pagedict=page,
                         screenshot_path=screenshot_path,
                         render_wait=options["render_wait"],
                         full_page=options["full_page"],
@@ -97,8 +96,5 @@ async def capture_screenshots(
                 tasks.append(task)
                 await asyncio.sleep(1/options["tasks_per_second"])
         results = [task.result() for task in tasks]
-        errors = [(identifier, url, error_message)
-                  for identifier, url, error_message in results
-                  if error_message]
         await context.close()
-        return errors
+        return results

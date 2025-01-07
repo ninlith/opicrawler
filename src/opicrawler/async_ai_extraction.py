@@ -18,12 +18,14 @@ class MenuItem(BaseModel):
     """Represents a menu item that allows nested submenus."""
     label: str
     link: Optional[str] = None
-    subitems: Optional[list['MenuItem']] = None
+    subitems: Optional[list["MenuItem"]] = None
+
 
 class Services(BaseModel):
     """Represents services provided by an entity."""
     description: str
     listing: list[str]
+
 
 class IndividualContact(BaseModel):
     """Represents an individual contact."""
@@ -31,6 +33,7 @@ class IndividualContact(BaseModel):
     role: Optional[str] = None
     email: Optional[str] = None
     phone: Optional[str] = None
+
 
 class ContactInformation(BaseModel):
     """Represents contact details for an entity."""
@@ -42,6 +45,7 @@ class ContactInformation(BaseModel):
     social_profiles: Optional[list[str]] = None
     individuals: Optional[list[IndividualContact]] = None
     additional_info: Optional[dict] = None
+
 
 class Extracts(BaseModel):
     """Schema for Structured Outputs."""
@@ -104,7 +108,7 @@ Please identify and extract the following:
         ],
         response_format=Extracts,
     )
-    logger.debug(f'x-request-id: {completion._request_id}, final_url: {page["final_url"]}')
+    logger.debug(f'x-request-id: {completion._request_id}, final_url: {page["url"]}')
 
     # Get the structured output from the response.
     content = completion.choices[0].message.content

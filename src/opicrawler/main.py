@@ -2,7 +2,6 @@
 
 import asyncio
 import contextlib
-import json
 import logging
 import multiprocessing
 import pickle
@@ -13,11 +12,10 @@ import threading
 from concurrent.futures import ProcessPoolExecutor
 from functools import partial
 import platformdirs
-from opicrawler import PACKAGE_NAME, __version__
+from opicrawler import PACKAGE_NAME, __version__, orm
 from opicrawler.async_ai_extraction import gather_extracts
 from opicrawler.async_requests import gather_responses, resolve_ip_addresses
 from opicrawler.async_screenshots import capture_screenshots
-from opicrawler.json_structure import structuralize_responses, validate_json
 from opicrawler.console_args import parse_arguments
 from opicrawler.eyecandy import setup_eyecandy
 from opicrawler.filepath_utils import ensure_path
@@ -109,7 +107,12 @@ async def async_main():
         )
         ensure_configuration_thread.start()
 
-    opiferum_ip_addresses = await resolve_ip_addresses("opiferum.fi")
+    orm.setup_engine(output_path/(PACKAGE_NAME + ".sqlite"))
+    if not console_args.database:
+        opiferum_ip_addresses = await resolve_ip_addresses("opiferum.fi")
+        orm.create_db_and_tables()
+        orm.create_or_replace_opiferum_ips(opiferum_ip_addresses)
+
     if console_args.responses:
         # Deserialize responses from a pickle file.
         logger.debug(f"Loading responses from '{console_args.responses.name}'")
@@ -138,11 +141,8 @@ async def async_main():
             waiting_status_id = progress_status.add_task("Waiting for asyncio to stabilize")
             await asyncio.sleep(1)
             progress_status.remove_task(waiting_status_id)
-    elif console_args.json:  # hidden input
-        sites = json.load(console_args.json)
-        validate_json(json.dumps(sites))
-        write_report(sites, [], output_path)
-        sys.exit(0)
+    elif console_args.database:
+        pass
     else:  # no input
         if not console_args.no_screenshots or console_args.browser_window:
             ensure_configuration_thread.join()
@@ -152,27 +152,17 @@ async def async_main():
         sys.exit(0)
 
     processing_status_id = progress_status.add_task("Processing responses")
-    if not console_args.responses:
+    if not console_args.responses and not console_args.database:
         # Serialize responses to a pickle file.
         responses_pickle_path = output_path/"responses.pkl"
         with open(responses_pickle_path, "wb") as f:
             pickle.dump(responses, f)
         logger.info(f"Responses saved to '{responses_pickle_path}'")
 
-    # Structuralize responses. Also filters out redundancies.
-    sites = structuralize_responses(responses, opiferum_ip_addresses)
-    del responses
-
-    # Select data for further processing or screenshot capturing.
-    pages = []
-    for identifier, v in sites["site_ids"].items():
-        for final_url in v["final_urls"]:
-            if "html" in v["final_urls"][final_url]:
-                pages.append({
-                    "identifier": identifier,
-                    "final_url": final_url,
-                    "html": v["final_urls"][final_url]["html"],
-                })
+    if not console_args.database:
+        orm.create_or_replace_structured_responses(responses)
+        del responses
+    pages = orm.select_pages()
     progress_status.remove_task(processing_status_id)
 
     if not console_args.no_extraction:
@@ -192,34 +182,18 @@ async def async_main():
             console_args.openai_model,
             callback=partial(progress_bar.update, extraction_bar_id),
         )
-        logger.info("AI data extraction done.")
+        orm.update_pages(pages)
         progress_bar.remove_task(extraction_bar_id)
-
-        # Insert processed data to sites.
-        for r in pages:
-            ref = sites["site_ids"][r["identifier"]]["final_urls"][r["final_url"]]
-            ref |= {
-                k: v
-                for k, v in r.items()
-                if k not in ["identifier", "final_url", "html"]
-            }
-
-    # Save the (more or less pointlessly convoluted) JSON file.
-    sites_path = output_path/"sites.json"
-    with open(sites_path, "w", encoding="utf8") as json_file:
-        json.dump(sites, json_file, indent=2)
-    logger.info(f"Structured data saved to '{sites_path}'")
+        logger.info("AI data extraction done.")
 
     # Take screenshots.
-    screenshot_errors = []
     if not console_args.no_screenshots:
         # Wait for configuration thread to finish.
         ensure_configuration_thread.join()
 
         screenshot_bar_id = progress_bar.add_task("Capturing screenshots")
-        id_url_pairs = [(r["identifier"], r["final_url"]) for r in pages]
-        screenshot_errors = await capture_screenshots(
-            id_url_pairs=id_url_pairs,
+        pages = await capture_screenshots(
+            pages=pages,
             path_to_extension=ubol_path,
             user_data_dir=playwright_user_data_path,
             callback=partial(progress_bar.update, screenshot_bar_id),
@@ -233,11 +207,13 @@ async def async_main():
                 "height": int(console_args.resolution.split("x")[1]),
             },
         )
+        orm.update_pages(pages)
         progress_bar.remove_task(screenshot_bar_id)
-        logger.info("Screenshot capturing done.")
+        logger.info("Screenshots captured.")
 
     # Write a report.
-    write_report(sites, screenshot_errors, output_path)
+    write_report(output_path)
+    logger.info("Report written.")
 
     live_display.stop()
     elapsed_time = time.perf_counter() - start_time

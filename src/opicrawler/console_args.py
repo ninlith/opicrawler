@@ -30,9 +30,9 @@ def parse_arguments():
         metavar="PKL",
     )
     input_exclusives.add_argument(
-        "--json",
-        help=argparse.SUPPRESS,  # hide option
-        type=argparse.FileType("r", encoding="UTF-8"),
+        "--database",
+        help="use existing database data",
+        action="store_true",
     )
     output_group = parser.add_argument_group("output options")
     output_group.add_argument(
