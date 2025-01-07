@@ -4,7 +4,7 @@ import asyncio
 import logging
 import stamina
 from playwright.async_api import async_playwright, Error
-from opicrawler.filepath_utils import ensure_path, filename_safe_encode
+from opicrawler.filepath_utils import ensure_path, sanitize_url_to_filename
 
 logger = logging.getLogger(__name__)
 
@@ -30,16 +30,14 @@ async def _capture_page(*, context, pagedict, screenshot_path, render_wait,
         # set the viewport size before navigating to the page."
         await page.goto(url)
         await page.wait_for_timeout(render_wait)
-        filename = filename_safe_encode(
+        filename = sanitize_url_to_filename(
             url,
             limit_length=True,
-            prefix=f"{identifier}_{counter[0]}_{width}x{height}=",
+            prefix=f"{identifier}_{width}x{height}_",
             postfix=f".{filetype}",
         )
-        logger.debug(
-            f"({counter[0]}/{counter[1]}), {identifier}, {url}, {width}x{height} -> '{filename}'"
-        )
-        await page.screenshot(path=screenshot_path/filename, full_page=full_page)
+        await page.screenshot(path=screenshot_path/f"{width}x{height}"/filename,
+                              full_page=full_page)
     await page.close()
     callback(advance=1)
     return pagedict

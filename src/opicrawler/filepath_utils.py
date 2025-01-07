@@ -1,6 +1,8 @@
 """File path utilities."""
 
 import base64
+import re
+import string
 from pathlib import Path
 
 
@@ -9,6 +11,19 @@ def ensure_path(pathlike) -> Path:
     path = Path(pathlike)
     path.mkdir(parents=True, exist_ok=True)
     return path
+
+
+def sanitize_url_to_filename(url, limit_length=False, prefix=None, postfix=None):
+    """Convert a URL to a filesystem-safe filename using a restricted character set."""
+    allowed_chars = string.ascii_letters + string.digits + "-_=."
+    url = re.sub(r"^.*://", "", url)
+    filename = "".join(c for c in url if c in allowed_chars)
+    if limit_length:
+        prefix = prefix or ""
+        postfix = postfix or ""
+        limit = 255 - len(prefix.encode("utf-8")) - len(postfix.encode("utf-8"))
+        return prefix + filename[:limit] + postfix
+    return filename
 
 
 def filename_safe_encode(text, limit_length=False, prefix=None, postfix=None):
